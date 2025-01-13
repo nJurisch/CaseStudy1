@@ -1,1 +1,1 @@
-{"users": {"1": {"id": "testnutzer@mail", "name": "testnutzer"}}}
+{"users": {"2": {"id": "testuser@mail", "name": "testuser"}, "3": {"id": "testnutzer3@mail", "name": "testnutzer2"}}, "devices": {"1": {"device_name": "cnc", "managed_by_user_id": "testuser@mail", "end_of_life": "2025-01-19", "maintenance_interval": 1, "first_maintenance": "2025-01-15"}}, "reservations": {"1": {"device_name": "cnc", "reserver": "user", "start_date": "2025-01-15", "end_date": "2025-01-17"}}}

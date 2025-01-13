@@ -1,108 +1,85 @@
 import os
 
 from tinydb import TinyDB, Query
-from serializer import serializer
+from datetime import datetime
 
+# Datenbank initialisieren
+db = TinyDB('device_management_db.json')
+devices_table = db.table('devices')
+reservations_table = db.table('reservations')
 
-class Device():
-    # Class variable that is shared between all instances of the class
-    db_connector = TinyDB(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.json'), storage=serializer).table('devices')
-
-    # Constructor
-    def __init__(self, device_name : str, managed_by_user_id : str):
+class Device:
+    def __init__(self, device_name, managed_by_user_id, end_of_life, maintenance_interval, first_maintenance):
         self.device_name = device_name
-        # The user id of the user that manages the device
-        # We don't store the user object itself, but only the id (as a key)
         self.managed_by_user_id = managed_by_user_id
-        self.is_active = True
-        
-    # String representation of the class
-    def __str__(self):
-        return f'Device (Object) {self.device_name} ({self.managed_by_user_id})'
+        self.end_of_life = end_of_life
+        self.maintenance_interval = maintenance_interval
+        self.first_maintenance = first_maintenance
 
-    # String representation of the class
-    def __repr__(self):
-        return self.__str__()
-    
     def store_data(self):
-        print("Storing data...")
-        # Check if the device already exists in the database
-        DeviceQuery = Query()
-        result = self.db_connector.search(DeviceQuery.device_name == self.device_name)
-        if result:
-            # Update the existing record with the current instance's data
-            result = self.db_connector.update(self.__dict__, doc_ids=[result[0].doc_id])
-            print("Data updated.")
-        else:
-            # If the device doesn't exist, insert a new record
-            self.db_connector.insert(self.__dict__)
-            print("Data inserted.")
-    
-    def delete(self):
-        print("Deleting data...")
-        # Check if the device exists in the database
-        DeviceQuery = Query()
-        result = self.db_connector.search(DeviceQuery.device_name == self.device_name)
-        if result:
-            # Delete the record from the database
-            self.db_connector.remove(doc_ids=[result[0].doc_id])
-            print("Data deleted.")
-        else:
-            print("Data not found.")
+        """Speichert das Gerät in der Datenbank."""
+        devices_table.insert(self.__dict__)
 
-    def set_managed_by_user_id(self, managed_by_user_id: str):
-        """Expects `managed_by_user_id` to be a valid user id that exists in the database."""
-        self.managed_by_user_id = managed_by_user_id
-
-    # Class method that can be called without an instance of the class to construct an instance of the class
-    @classmethod
-    def find_by_attribute(cls, by_attribute: str, attribute_value: str, num_to_return=1):
-        # Load data from the database and create an instance of the Device class
-        DeviceQuery = Query()
-        result = cls.db_connector.search(DeviceQuery[by_attribute] == attribute_value)
-
-        if result:
-            data = result[:num_to_return]
-            device_results = [cls(d['device_name'], d['managed_by_user_id']) for d in data]
-            return device_results if num_to_return > 1 else device_results[0]
-        else:
-            return None
+    def add_reservation(self, reserver, start_date, end_date):
+        """Fügt eine Reservierung für das Gerät hinzu."""
+        reservations_table.insert({
+            "device_name": self.device_name,
+            "reserver": reserver,
+            "start_date": str(start_date),
+            "end_date": str(end_date)
+        })
 
     @classmethod
-    def find_all(cls) -> list:
-        # Load all data from the database and create instances of the Device class
+    def find_all(cls):
+        """Liest alle Geräte aus der Datenbank und gibt sie als Objekte zurück."""
         devices = []
-        for device_data in Device.db_connector.all():
-            devices.append(Device(device_data['device_name'], device_data['managed_by_user_id']))
+        for device_data in devices_table.all():
+            devices.append(cls(
+                device_name=device_data['device_name'],
+                managed_by_user_id=device_data['managed_by_user_id'],
+                end_of_life=device_data['end_of_life'],
+                maintenance_interval=device_data['maintenance_interval'],
+                first_maintenance=device_data['first_maintenance']
+            ))
         return devices
 
+    @classmethod
+    def find_by_attribute(cls, attribute, value):
+        """Findet ein Gerät basierend auf einem bestimmten Attribut und Wert."""
+        DeviceQuery = Query()
+        result = devices_table.search(DeviceQuery[attribute] == value)
+        if result:
+            device_data = result[0]
+            return cls(
+                device_name=device_data['device_name'],
+                managed_by_user_id=device_data['managed_by_user_id'],
+                end_of_life=device_data['end_of_life'],
+                maintenance_interval=device_data['maintenance_interval'],
+                first_maintenance=device_data['first_maintenance']
+            )
+        return None
 
+    @classmethod
+    def get_reservations(cls):
+        """Gibt alle Reservierungen zurück."""
+        return reservations_table.all()
 
-    
+    @classmethod
+    def get_maintenance_schedule(cls):
+        """Erstellt einen Wartungsplan für alle Geräte."""
+        schedule = []
+        for device in cls.find_all():
+            schedule.append({
+                "Gerät": device.device_name,
+                "Nächste Wartung": device.first_maintenance
+            })
+        return schedule
 
-if __name__ == "__main__":
-    # Create a device
-    device1 = Device("Device1", "one@mci.edu")
-    device2 = Device("Device2", "two@mci.edu") 
-    device3 = Device("Device3", "two@mci.edu") 
-    device4 = Device("Device4", "two@mci.edu") 
-    device1.store_data()
-    device2.store_data()
-    device3.store_data()
-    device4.store_data()
-    device5 = Device("Device3", "four@mci.edu") 
-    device5.store_data()
-
-    #loaded_device = Device.find_by_attribute("device_name", "Device2")
-    loaded_device = Device.find_by_attribute("managed_by_user_id", "two@mci.edu")
-    if loaded_device:
-        print(f"Loaded Device: {loaded_device}")
-    else:
-        print("Device not found.")
-
-    devices = Device.find_all()
-    print("All devices:")
-    for device in devices:
-        print(device)
-
+    @classmethod
+    def calculate_total_maintenance_cost(cls):
+        """Berechnet die Gesamtkosten aller Gerätewartungen."""
+        total_cost = 0
+        for device in cls.find_all():
+            total_cost += (365 / device.maintenance_interval) * 100  # Beispielkosten
+        return total_cost
     
