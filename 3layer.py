@@ -3,6 +3,7 @@ from users import User
 from devices import Device
 from queries import find_devices
 import streamlit as st
+from datetime import datetime, timedelta
 
 # Initialisierung des Frontends
 st.title("Geräte-Verwaltung System (Drei-Schichten-Architektur)")
@@ -55,7 +56,12 @@ elif menu == "Geräte-Verwaltung":
                 first_maintenance=str(first_maintenance)
             )
             device.store_data()
-            st.success("Gerät wurde erfolgreich angelegt.")
+            # Automatische Reservierungen für Wartungstage
+            current_date = first_maintenance
+            while current_date <= end_of_life:
+                device.add_reservation("Maintenance", current_date, current_date)
+                current_date += timedelta(days=maintenance_interval)
+            st.success("Gerät wurde erfolgreich angelegt und Wartungstage reserviert.")
 
     elif action == "Geräte anzeigen":
         devices = Device.find_all()
@@ -67,7 +73,7 @@ elif menu == "Geräte-Verwaltung":
 
 elif menu == "Reservierungssystem":
     st.header("Reservierungssystem")
-    action = st.radio("Aktion", ["Reservierung eintragen", "Reservierungen anzeigen"])
+    action = st.radio("Aktion", ["Reservierung eintragen", "Reservierungen anzeigen", "Reservierung entfernen"])
 
     if action == "Reservierung eintragen":
         devices = find_devices()
@@ -94,14 +100,44 @@ elif menu == "Reservierungssystem":
         else:
             st.write("Keine Reservierungen gefunden.")
 
+    elif action == "Reservierung entfernen":
+        reservations = Device.get_reservations()
+        if reservations:
+            reservation_to_remove = st.selectbox("Wähle Reservierung zur Entfernung", [f"{r['device_name']} - {r['start_date']}" for r in reservations])
+            if st.button("Reservierung entfernen"):
+                device_name, start_date = reservation_to_remove.split(" - ")
+                Device.remove_reservation(device_name, start_date)
+                st.success("Reservierung wurde entfernt.")
+
 elif menu == "Wartungs-Management":
     st.header("Wartungs-Management")
-    maintenance_action = st.radio("Aktion", ["Wartungen anzeigen", "Wartungskosten berechnen"])
+    maintenance_action = st.radio("Aktion", ["Wartungen anzeigen", "Wartung hinzufügen", "Wartung entfernen"])
 
     if maintenance_action == "Wartungen anzeigen":
-        maintenance_data = Device.get_maintenance_schedule()
-        st.write(maintenance_data)
+        devices = Device.find_all()
+        maintenance_data = [
+            {"Gerät": d.device_name, "Nächste Wartung": datetime.strptime(d.first_maintenance, "%Y-%m-%d").strftime("%d.%m.%Y")}
+            for d in devices
+        ]
+        st.table(maintenance_data)
 
-    elif maintenance_action == "Wartungskosten berechnen":
-        total_cost = Device.calculate_total_maintenance_cost()
-        st.write(f"Gesamtkosten für Wartungen: {total_cost:.2f} EUR")
+    elif maintenance_action == "Wartung hinzufügen":
+        devices = find_devices()
+        if devices:
+            device_name = st.selectbox("Gerät auswählen", devices, key="wartung_hinzufügen")
+            loaded_device = Device.find_by_attribute("device_name", device_name)
+            if loaded_device:
+                maintenance_date = st.date_input("Wartungsdatum", key="wartungsdatum_hinzufügen")
+                if st.button("Wartung speichern"):
+                    loaded_device.add_reservation("Maintenance", maintenance_date, maintenance_date)
+                    st.success("Wartung wurde hinzugefügt.")
+
+    elif maintenance_action == "Wartung entfernen":
+        reservations = Device.get_reservations()
+        if reservations:
+            reservation_to_remove = st.selectbox("Wähle Wartung zur Entfernung", [f"{r['device_name']} - {r['start_date']}" for r in reservations if r['reserver'] == "Maintenance"])
+            if st.button("Wartung entfernen"):
+                device_name, start_date = reservation_to_remove.split(" - ")
+                Device.remove_reservation(device_name, start_date)
+                st.success("Wartung wurde entfernt.")
+

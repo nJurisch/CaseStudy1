@@ -30,6 +30,12 @@ class Device:
         })
 
     @classmethod
+    def remove_reservation(cls, device_name, start_date):
+        """Entfernt eine Reservierung basierend auf Gerät und Startdatum."""
+        ReservationQuery = Query()
+        reservations_table.remove((ReservationQuery.device_name == device_name) & (ReservationQuery.start_date == start_date))
+
+    @classmethod
     def find_all(cls):
         """Liest alle Geräte aus der Datenbank und gibt sie als Objekte zurück."""
         devices = []
@@ -82,4 +88,3 @@ class Device:
         for device in cls.find_all():
             total_cost += (365 / device.maintenance_interval) * 100  # Beispielkosten
         return total_cost
-    
