@@ -3,7 +3,12 @@ from users import User
 from devices import Device
 from queries import find_devices
 import streamlit as st
+from tinydb import TinyDB
 from datetime import datetime, timedelta
+
+# Datenbank initialisieren
+DB_PATH = 'device_management_db.json'
+db = TinyDB(DB_PATH)
 
 # Initialisierung des Frontends
 st.title("Geräte-Verwaltung System (Drei-Schichten-Architektur)")
@@ -53,7 +58,7 @@ elif menu == "Geräte-Verwaltung":
                 managed_by_user_id=responsible_person,
                 end_of_life=str(end_of_life),
                 maintenance_interval=maintenance_interval,
-                first_maintenance=str(first_maintenance)
+                first_maintenance=str(first_maintenance),
             )
             device.store_data()
             # Automatische Reservierungen für Wartungstage
@@ -76,7 +81,7 @@ elif menu == "Reservierungssystem":
     action = st.radio("Aktion", ["Reservierung eintragen", "Reservierungen anzeigen", "Reservierung entfernen"])
 
     if action == "Reservierung eintragen":
-        devices = find_devices()
+        devices = [d.device_name for d in Device.find_all()]
         if devices:
             device_name = st.selectbox("Gerät auswählen", devices)
             loaded_device = Device.find_by_attribute("device_name", device_name)
@@ -122,7 +127,7 @@ elif menu == "Wartungs-Management":
         st.table(maintenance_data)
 
     elif maintenance_action == "Wartung hinzufügen":
-        devices = find_devices()
+        devices = [d.device_name for d in Device.find_all()]
         if devices:
             device_name = st.selectbox("Gerät auswählen", devices, key="wartung_hinzufügen")
             loaded_device = Device.find_by_attribute("device_name", device_name)
@@ -130,7 +135,7 @@ elif menu == "Wartungs-Management":
                 maintenance_date = st.date_input("Wartungsdatum", key="wartungsdatum_hinzufügen")
                 if st.button("Wartung speichern"):
                     loaded_device.add_reservation("Maintenance", maintenance_date, maintenance_date)
-                    st.success("Wartung wurde hinzugefügt.")
+                    st.success("Wartung wurde hinzugefügt und das Gerät für 'Maintenance' reserviert.")
 
     elif maintenance_action == "Wartung entfernen":
         reservations = Device.get_reservations()
@@ -139,5 +144,6 @@ elif menu == "Wartungs-Management":
             if st.button("Wartung entfernen"):
                 device_name, start_date = reservation_to_remove.split(" - ")
                 Device.remove_reservation(device_name, start_date)
-                st.success("Wartung wurde entfernt.")
+                st.success("Wartung wurde entfernt und die Reservierung für 'Maintenance' gelöscht.")
+
 

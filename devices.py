@@ -1,5 +1,3 @@
-import os
-
 from tinydb import TinyDB, Query
 from datetime import datetime
 
